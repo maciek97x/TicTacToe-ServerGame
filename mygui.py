@@ -6,15 +6,7 @@ from pygame.locals import *
 colors = {'white':          (255, 255, 255),
           'black':          (  0,   0,   0),
           'red':            (255, 127, 127),
-          'blue':           (127, 127, 255),
-          'plot_poly':      ( 63,  63, 255),
-          'plot_spline':    ( 63, 255,  63),
-          'plot_spline_S':  ( 63, 255, 255),
-          'points':         (  0,   0, 255),
-          'grid':           (191, 191, 255),
-          'main_bg':        (255, 255, 255),
-          'bg':             (191, 191, 255),
-          'help':           (255,  63,  63)}
+          'blue':           (127, 127, 255)}
 
 def terminate():
     pygame.quit()
