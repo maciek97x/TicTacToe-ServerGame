@@ -16,7 +16,11 @@ colors = {'white':          (255, 255, 255),
           'bg':             (191, 191, 255),
           'help':           (255,  63,  63)}
 
-def drawText(text, size, color, surface, position, allign=''):
+def terminate():
+    pygame.quit()
+    sys.exit()
+    
+def draw_text(text, size, color, surface, position, allign=''):
     # function for drawing text on screen
     font = pygame.font.SysFont("consolasms", size)
     textobj = font.render(text, 1, color)
@@ -29,72 +33,115 @@ def drawText(text, size, color, surface, position, allign=''):
         textrect.center = position
     surface.blit(textobj, textrect)
 
-class Button:
-    # box for reading clicks on screen
-    def __init__(self, window, pos, size, type='none', color='white'):
-        self.window = window
-        self.pos = pos
-        self.size = size
-        self.type = type
-        self.color = color
+class GUI:
+    def __init__(self, window):
+        self.__window = window
+        self.__elements = []
+    
+    def draw(self):
+        for element in self.__elements:
+            element.draw()
+            
+    def handle_click(self, event):
+        for element in self.__elements:
+            element.handle_click(event)
+    
+    def add(self, element):
+        if isinstance(element, GUIElement):
+            self.__elements.append(element)
+        else:
+            raise TypeError
+            
+class GUIElement:
+    def __init__(self, window, pos, size):
+        self.__window = window
+        self.__pos = pos
+        self.__size = size
+        
+    @property
+    def pos(self):
+        return self.__pos
+
+    @pos.setter
+    def pos(self, pos):
+        self.__pos = pos
+        
+    @property
+    def size(self):
+        return self.__size
+
+    @size.setter
+    def size(self, size):
+        self.__size = size
+    
+
+class Button(GUIElement):
+    def __init__(self, window, pos, size, text='', color='white'):
+        GUIElement.__init__(self, window, pos, size)
+        self.__text = text
+        self.__color = color
 
     def draw(self):
-        pygame.draw.rect(self.window, (0, 0, 0), pygame.Rect(self.pos, self.size))
-        if self.type == 'plus':
-            pygame.draw.line(self.window, colors[self.color], (self.pos[0] + 5, self.pos[1] + self.size[1]/2),
-                             (self.pos[0] + self.size[0] - 5, self.pos[1] + self.size[1]/2), 5)
-            pygame.draw.line(self.window, colors[self.color], (self.pos[0] + self.size[0]/2, self.pos[1] + 5),
-                             (self.pos[0] + self.size[0]/2, self.pos[1] + self.size[1] - 5), 5)
-        elif self.type == 'cross':
-            pygame.draw.line(self.window, colors[self.color], (self.pos[0] + 5, self.pos[1] + 5),
-                             (self.pos[0] + self.size[0] - 5, self.pos[1] + self.size[1] - 5), 5)
-            pygame.draw.line(self.window, colors[self.color], (self.pos[0] + self.size[0] - 5, self.pos[1] + 5),
-                             (self.pos[0] + 5, self.pos[1] + self.size[1] - 5), 5)
-        elif self.type == '>':
-            pygame.draw.line(self.window, colors[self.color], (self.pos[0] + self.size[0]/2 - 5, self.pos[1] + 5),
-                             (self.pos[0] + self.size[0] - 5, self.pos[1] + self.size[1]/2), 5)
-            pygame.draw.line(self.window, colors[self.color], (self.pos[0] + self.size[0]/2 - 5, self.pos[1] + self.size[1] - 5),
-                             (self.pos[0] + self.size[0] - 5, self.pos[1] + self.size[1]/2), 5)
-        elif self.type == '<':
-            pygame.draw.line(self.window, colors[self.color], (self.pos[0] + self.size[0]/2 + 5, self.pos[1] + 5),
-                             (self.pos[0] + 5, self.pos[1] + self.size[1]/2), 5)
-            pygame.draw.line(self.window, colors[self.color], (self.pos[0] + self.size[0]/2 + 5, self.pos[1] + self.size[1] - 5),
-                             (self.pos[0] + 5, self.pos[1] + self.size[1]/2), 5)
+        pygame.draw.rect(self.__window, (0, 0, 0), pygame.Rect(self.__pos, self.__size))
+        draw_text(self.__text, self.__size[0], colors['black'], self.__window,\
+                  (self.__pos[0] + self.__size[0], self.__pos[1] + self.__size[1]), 'lb')
         
-    def click(self, event):
-        borders = (self.pos[0], self.pos[1], self.pos[0] + self.size[0], self.pos[1] + self.size[1])
-        if borders[0] <= event.pos[0] <= borders[2] and borders[1] <= event.pos[1] <= borders[3]:
-            return True
-        return False
-    
-    def changePos(self, x, y):
-        self.pos = (x, y)
+    def handle_click(self, event):
+        borders = (self.__pos[0], self.__pos[1], self.__pos[0] + self.__size[0], self.__pos[1] + self.__size[1])
+        if borders[0] <= event.__pos[0] <= borders[2] and borders[1] <= event.__pos[1] <= borders[3]:
+            pass
             
-class CheckBox:
-    # box for reading clicks on screen
-    def __init__(self, pos, size, label = '', color='white', checked = True):
-        self.pos = pos
-        self.size = size
-        self.label = label
-        self.color = color
-        self.checked = checked
+class CheckBox(GUIElement):
+    def __init__(self, window, pos, size, text = '', color='white', checked = True):
+        GUIElement.__init__(self, window, pos, size)
+        self.__text = text
+        self.__color = color
+        self.__checked = checked
     
-    def getValue(self):
-        return self.value
+    @property
+    def is_checked(self):
+        return self.__checked
+    
+    @checked.setter
+    def checked(self, checked):
+        self.__checked = checked
     
     def draw(self):
-        pygame.draw.rect(self.window, (0, 0, 0), pygame.Rect(self.pos, self.size))
-        drawText(self.label, self.size[0], colors['black'], self.window, (self.pos[0] + self.size[0], self.pos[1] + self.size[1]), 'lb')
+        pygame.draw.rect(self.__window, (0, 0, 0), pygame.Rect(self.__pos, self.__size))
+        draw_text(self.__text, self.__size[0], colors['black'], self.__window,\
+                  (self.__pos[0] + self.__size[0], self.__pos[1] + self.__size[1]), 'lb')
         if self.value:
-            pygame.draw.line(self.window, colors[self.color], (self.pos[0] + 5, self.pos[1] + 5),
-                             (self.pos[0] + self.size[0] - 5, self.pos[1] + self.size[1] - 5), 5)
-            pygame.draw.line(self.window, colors[self.color], (self.pos[0] + self.size[0] - 5, self.pos[1] + 5),
-                             (self.pos[0] + 5, self.pos[1] + self.size[1] - 5), 5)
+            pygame.draw.line(self.__window, colors[self.__color], (self.__pos[0] + 5, self.__pos[1] + 5),
+                             (self.__pos[0] + self.__size[0] - 5, self.__pos[1] + self.__size[1] - 5), 5)
+            pygame.draw.line(self.__window, colors[self.__color], (self.__pos[0] + self.__size[0] - 5, self.__pos[1] + 5),
+                             (self.__pos[0] + 5, self.__pos[1] + self.__size[1] - 5), 5)
         
-    def click(self, event):
-        borders = (self.pos[0], self.pos[1], self.pos[0] + self.size[0], self.pos[1] + self.size[1])
-        if borders[0] <= event.pos[0] <= borders[2] and borders[1] <= event.pos[1] <= borders[3]:
-            self.checked = not self.checked
+    def handle_click(self, event):
+        borders = (self.__pos[0], self.__pos[1], self.__pos[0] + self.__size[0], self.__pos[1] + self.__size[1])
+        if borders[0] <= event.__pos[0] <= borders[2] and borders[1] <= event.__pos[1] <= borders[3]:
+            self.__checked = not self.__checked
             
-    def changePos(self, x, y):
-        self.pos = (x, y)
+        
+class TextBox:
+    def __init__(self, window, pos, size, prompt_text=''):
+        GUIElement.__init__(self, window, pos, size)
+        self.__prompt_text = prompt_text
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
