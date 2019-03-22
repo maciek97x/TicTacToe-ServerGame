@@ -136,6 +136,14 @@ class Button(GUIElement):
         self.__on_action = on_action
         self.__on_action_args = on_action_args
 
+    @property
+    def text(self):
+        return self.__text
+
+    @text.setter
+    def text(self, value):
+        self.__text = value
+
     def draw(self):
         pygame.draw.rect(self.window, (0, 0, 0), pygame.Rect(self.pos, self.size))
         pygame.draw.rect(self.window, (255, 255, 255), pygame.Rect((self.pos[0] + 2, self.pos[1] + 2), (self.size[0] - 4, self.size[1] - 4)))
