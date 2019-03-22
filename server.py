@@ -10,22 +10,16 @@ import re
 
 os.system("mode con: cols=50 lines=20")
 players = dict([])
-active_player = -1
-first_player = -1
 game_in_progress = False
-init_game = dict([])
-send_attack_result = dict([])
-send_round_end = dict([])
-send_game_over = dict([])
-attack_result = ''
-board = [[[0, 0] for _ in range(5)] for _ in range(5)]
-round_count = 0
-season_count = 0
-season_results = [[] for _ in range(10)]
-active_id = []
+board = [[0 for _ in range(3)] for _ in range(3)]
+player_x = -1
+player_o = -1
+players[-1] = 'none'
+player_move = 0
+send_state = dict([])
 
 def save_to_file(msg, ip, port, if_out):
-    file = open('communication.txt', 'a')
+    file = open('server_log.txt', 'a')
     if if_out:
         file.write('to   {}:{} '.format(ip, port))
     else:
@@ -93,7 +87,35 @@ def start_server():
     soc.close()
 
 def client_thread(connection, ip, port, max_buffer_size=5120):
-    pass
+    global board
+    global game_in_progress
+    global players
+    global player_x
+    global player_o
+    global player_move
+
+    player_nickname = receive_input(connection, ip, port, max_buffer_size)
+    player_id = 1
+    while player_id in players.keys():
+        player_id += 1
+    players[player_id] = player_nickname
+    send_state[player_id] = False
+    game_in_progress = False
+
+    while not game_in_progress:
+        pass
+
+    if game_in_progress:
+        board = [[0 for _ in range(3)] for _ in range(3)]
+    while game_in_progress:
+        game_state = ''
+        game_state += 'p ' + ' '.join([players[x] for x in players.keys() if x != -1])
+        game_state += ' b ' + ' '.join(map(str, [board[x//3][x%3] for x in range(9)]))
+        game_state += ' x ' + str(players[player_x])
+        game_state += ' o ' + str(players[player_o])
+        game_state += ' m ' + str(int(player_move == player_id))
+        connection.send(game_state.encode('utf8'))
+        print(receive_input(connection, ip, port, max_buffer_size))
 
 def receive_input(connection, ip, port, max_buffer_size):
     client_input = connection.recv(max_buffer_size)
@@ -102,10 +124,8 @@ def receive_input(connection, ip, port, max_buffer_size):
         print("The input size is greater than expected {}".format(client_input_size))
 
     decoded_input = client_input.decode("utf8").rstrip()  # decode and strip end of line
-    result = decoded_input.upper()
-    save_to_file(result, ip, port, 0)
 
-    return result
+    return decoded_input
 
 
 start_server()

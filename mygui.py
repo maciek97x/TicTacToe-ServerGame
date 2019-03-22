@@ -29,21 +29,30 @@ def draw_text(text, size, color, surface, position, align=''):
 class GUI:
     def __init__(self, window):
         self.__window = window
-        self.__elements = []
+        self.__elements = dict([])
     
     def draw(self):
-        for element in self.__elements:
+        for element in self.__elements.values():
             element.draw()
             
     def handle_event(self, event):
-        for element in self.__elements:
+        for element in self.__elements.values():
             element.handle_event(event)
     
-    def add(self, element):
+    def add(self, element_id, element):
         if isinstance(element, GUIElement):
-            self.__elements.append(element)
+            self.__elements[element_id] = element
         else:
             raise TypeError
+
+    def id_exists(self, element_id):
+        return element_id in self.__elements.keys()
+    
+    def get_element(self, element_id):
+        return self.__elements[element_id]
+
+    def clear(self):
+	    self.__elements = dict([])
             
 class GUIElement:
     def __init__(self, window, pos, size):
@@ -74,16 +83,62 @@ class GUIElement:
     @size.setter
     def size(self, value):
         self.__size = value
-    
 
-class Button(GUIElement):
+    def draw(self):
+        pass
+
+    def handle_event(self, event):
+        pass
+    
+class Text(GUIElement):
     def __init__(self, window, pos, size, text='', color='white'):
         GUIElement.__init__(self, window, pos, size)
         self.__text = text
         self.__color = color
+    
+    @property
+    def text(self):
+        return self.__text
+
+    @text.setter
+    def text(self, value):
+        self.__text = value
 
     def draw(self):
-        pygame.draw.rect(self.__window, (0, 0, 0), pygame.Rect(self.__pos, self.__size))
+        text_size = self.size[1]*4//5
+        draw_text(self.__text, text_size, colors['black'], self.window,\
+                  (self.pos[0] + self.size[0]/2, self.pos[1] + self.size[1]/2))
+
+class TextList(GUIElement):
+    def __init__(self, window, pos, size, text_list=[], color='white'):
+        GUIElement.__init__(self, window, pos, size)
+        self.__text_list = text_list
+        self.__color = color
+    
+    @property
+    def text_list(self):
+        return self.__text_list
+
+    @text_list.setter
+    def text_list(self, value):
+        self.__text_list = value
+
+    def draw(self):
+        text_size = self.size[1]*4//5
+        for i, text in enumerate(self.__text_list):
+            draw_text(text, text_size, colors['black'], self.window,\
+                  (self.pos[0] + self.size[0]/2, self.pos[1] + self.size[1]/2 + self.size[1]*i))
+class Button(GUIElement):
+    def __init__(self, window, pos, size, text='', color='white', on_action=None, on_action_args=()):
+        GUIElement.__init__(self, window, pos, size)
+        self.__text = text
+        self.__color = color
+        self.__on_action = on_action
+        self.__on_action_args = on_action_args
+
+    def draw(self):
+        pygame.draw.rect(self.window, (0, 0, 0), pygame.Rect(self.pos, self.size))
+        pygame.draw.rect(self.window, (255, 255, 255), pygame.Rect((self.pos[0] + 2, self.pos[1] + 2), (self.size[0] - 4, self.size[1] - 4)))
         text_size = self.size[1]*4//5
         draw_text(self.__text, text_size, colors['black'], self.window,\
                   (self.pos[0] + self.size[0]/2, self.pos[1] + self.size[1]/2))
@@ -92,7 +147,8 @@ class Button(GUIElement):
         if event.type == MOUSEBUTTONDOWN:
             borders = (self.pos[0], self.pos[1], self.pos[0] + self.size[0], self.pos[1] + self.size[1])
             if borders[0] <= event.pos[0] <= borders[2] and borders[1] <= event.pos[1] <= borders[3]:
-                pass
+                if self.__on_action is not None:
+                    self.__on_action(*self.__on_action_args)
             
 class CheckBox(GUIElement):
     def __init__(self, window, pos, size, text = '', color='white', checked = True):
