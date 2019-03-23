@@ -7,6 +7,7 @@ from threading import Thread
 import os
 from random import randint
 import re
+import time
 
 os.system("mode con: cols=50 lines=20")
 players = dict([])
@@ -15,21 +16,41 @@ board = [[0 for _ in range(3)] for _ in range(3)]
 players['none'] = 'none'
 player_x = 'none'
 player_o = 'none'
+player_win = 0
 player_move = 1
 send_state = dict([])
 
 def save_to_file(msg, ip, port, if_out):
     file = open('server_log.txt', 'a')
     if if_out:
-        file.write('to   {}:{} '.format(ip, port))
+        file.write('to   {}:{} {}\n'.format(ip, port, msg))
     else:
-        file.write('from {}:{} '.format(ip, port))
-    file.write(msg + '\n')
+        file.write('from {}:{} {}\n'.format(ip, port, msg))
     file.close()
 
 def check_board():
     global board
-    # <----- to do
+    sums = [[0, 0] for _ in range(8)]
+    empty = 0
+    for x in range(3):
+        for y in range(3):
+            if board[x][y] != 0:
+                sums[x][board[x][y] - 1] += 1
+                sums[3 + y][board[x][y] - 1] += 1
+                if x == y:
+                    sums[6][board[x][y] - 1] += 1
+                if x == 2 - y:
+                    sums[7][board[x][y] - 1] += 1
+            else:
+                empty += 1
+    for o, x in sums:
+        if o == 3:
+            return 1
+        elif x == 3:
+            return 2
+    if empty == 0:
+        return 3
+    return 0
 
 def start_server():
     host = "127.0.0.1"
@@ -67,43 +88,67 @@ def data_receive_thread(connection, ip, port, max_buffer_size=5120):
     global players
     global player_x
     global player_o
+    global player_win
     global player_move
     player_id = '{}:{}'.format(ip, port)
+    
+    time.sleep(1)
 
     # game loop
     while True:
         received_data = connection.recv(max_buffer_size).decode('utf8')
-        print('received: {}'.format(received_data))
+        print('received: {} from {}:{}'.format(received_data, ip, port))
         data = received_data.split()
+        if re.match(r'^quit', received_data ) is not None:
+            del players[player_id]
+            del send_state[player_id]
+            if player_o == player_id:
+                player_o = 'none'
+                game_in_progress = False
+            if player_x == player_id:
+                player_x = 'none'
+                game_in_progress = False
+            connection.send('closed'.encode('utf8'))
+            for key in send_state.keys():
+                send_state[key] = True            
+            break
+        
         if not game_in_progress:
-            if re.match(r'^sit_x', received_data):
-                if player_x == 'none':
-                    player_x = player_id
+            if re.match(r'^sit_o', received_data):
+                if player_o == 'none' and player_x != player_id:
+                    player_o = player_id
                     players[player_id][1] = 1
-                    # send update for all clients
                     for key in send_state.keys():
                         send_state[key] = True
-            if re.match(r'^sit_o', received_data):
-                if player_o == 'none':
-                    player_o = player_id
+            if re.match(r'^sit_x', received_data):
+                if player_x == 'none' and player_o != player_id:
+                    player_x = player_id
                     players[player_id][1] = 2
+                    # send update for all clients
                     for key in send_state.keys():
                         send_state[key] = True
             if player_o != 'none' and player_x != 'none':
                 # init game
                 game_in_progress = True
-                player_move = 1
+                player_move = randint(1,2)
+                player_win = 0
                 board = [[0 for _ in range(3)] for _ in range(3)]
                 
         else:
-            print(player_move, data[1:3], players[player_id][1])
             if player_move == players[player_id][1] and re.match('^move [0-2] [0-2]', received_data) is not None:
                 x, y = map(int, data[1:3])
                 if board[x][y] == 0:
                     board[x][y] = players[player_id][1]
                     player_move = 3 - player_move
+                    win = check_board()
+                    if win != 0:
+                        player_x = 'none'
+                        player_o = 'none'
+                        player_win = win
+                        game_in_progress = False
                     for key in send_state.keys():
                         send_state[key] = True
+                    
             
 
 def client_thread(connection, ip, port, max_buffer_size=5120):
@@ -112,28 +157,34 @@ def client_thread(connection, ip, port, max_buffer_size=5120):
     global players
     global player_x
     global player_o
+    global player_win
     global player_move
 
     player_nickname = connection.recv(max_buffer_size).decode('utf8')
+    print('received: {} from {}:{}'.format(player_nickname, ip, port))
     player_id = 1
     player_mode = 0
     
     player_id = '{}:{}'.format(ip, port)
     players[player_id] = [player_nickname, 0]
-    send_state[player_id] = False
+    send_state[player_id] = True
     
     for key in send_state.keys():
         send_state[key] = True
-    
+        
+    time.sleep(1)
     while True:
         # send game state to client if need to
-        if send_state[player_id]:
-            game_state = 'p ' + ' '.join([players[x][0] for x in players.keys() if x != 'none']) +\
-                        ' b ' + ' '.join(map(str, [board[x//3][x%3] for x in range(9)])) +\
-                        ' x ' + str(players[player_x][0]) +\
-                        ' o ' + str(players[player_o][0]) +\
-                        ' m ' + str(int(player_move == players[player_id][1]))
-            connection.send(game_state.encode('utf8'))
-            send_state[player_id] = False
-        
+        try:
+            if send_state[player_id]:
+                game_state = 'p ' + ' '.join([players[x][0] for x in players.keys() if x != 'none']) +\
+                            ' b ' + ' '.join(map(str, [board[x//3][x%3] for x in range(9)])) +\
+                            ' x ' + ' >'[player_move == 2] + 'x-' + str(players[player_x][0]) +\
+                            ' o ' + ' >'[player_move == 1] + 'o-' + str(players[player_o][0]) +\
+                            ' w ' + str(player_win) +\
+                            ' m ' + str(int(player_move == players[player_id][1]))
+                connection.send(game_state.encode('utf8'))
+                send_state[player_id] = False
+        except:
+            break
 start_server()
