@@ -6,13 +6,15 @@ from pygame.locals import *
 from threading import Thread
 import mygui
 import re
-
-
 import os
 
 # creating socket
 soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-host = "127.0.0.1"
+if len(sys.argv) > 1:
+    host = sys.argv[1]
+else:
+    host = '127.0.0.1'
+print('host: {}'.format(host))
 port = 8888
 
 # window size
@@ -109,14 +111,15 @@ def set_menu(value):
 def sit(value):
     if value in 'xo':
         print('sending: sit_{}'.format(value))
-        soc.send('sit_{}'.format(value).encode('utf8'))
+        soc.send('sit_{} '.format(value).encode('utf8'))
 
 def send_move(x, y):
     global my_move
     if my_move:
+        if board[x][y] == 0:
+            my_move = False
         print('sending: move {} {}'.format(x, y))
-        soc.send('move {} {}'.format(x, y).encode('utf8'))
-        my_move = False
+        soc.send('move {} {} '.format(x, y).encode('utf8'))
 
 menu = 0
 

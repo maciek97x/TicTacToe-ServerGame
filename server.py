@@ -53,7 +53,7 @@ def check_board():
     return 0
 
 def start_server():
-    host = "127.0.0.1"
+    host = '10.0.0.4'
     port = 8888  # arbitrary non-privileged port
 
     soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
