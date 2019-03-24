@@ -34,11 +34,13 @@ class GUI:
 
     def draw(self):
         for element in self.__elements.values():
-            element.draw()
+            if not element.hide:
+                element.draw()
 
     def handle_event(self, event):
         for element in self.__elements.values():
-            element.handle_event(event)
+            if not element.hide:
+                element.handle_event(event)
 
     def add(self, element_id, element):
         if isinstance(element, GUIElement):
@@ -60,6 +62,7 @@ class GUIElement:
         self.__window = window
         self.__pos = pos
         self.__size = size
+        self.__hide = False
 
     @property
     def window(self):
@@ -85,6 +88,14 @@ class GUIElement:
     def size(self, value):
         self.__size = value
 
+    @property
+    def hide(self):
+        return self.__hide
+    
+    @hide.setter
+    def hide(self, value):
+        self.__hide = value
+        
     def draw(self):
         pass
 
