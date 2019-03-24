@@ -35,6 +35,7 @@ board = [[0 for x in range(3)] for y in range(3)]
 players_list = []
 player_x = ''
 player_o = ''
+player_move = 0
 player_win = 0
 my_move = True
 
@@ -73,6 +74,7 @@ def connection_thread():
         b_index = received_data.index('b')
         x_index = received_data.index('x')
         o_index = received_data.index('o')
+        n_index = received_data.index('n')
         w_index = received_data.index('w')
         m_index = received_data.index('m')
         for x in range(3):
@@ -83,12 +85,17 @@ def connection_thread():
         players_list = received_data[p_index + 1:b_index]
         player_x = received_data[x_index + 1]
         player_o = received_data[o_index + 1]
+        player_move = int(received_data[n_index + 1])
         player_win = int(received_data[w_index + 1])
         my_move = bool(int(received_data[m_index + 1]))
         if gui.id_exists('textlist_players'):
             gui.get_element('textlist_players').text_list = players_list
+        if gui.id_exists('text_player_o'):
+            gui.get_element('text_player_o').text = ' > '[player_move]
         if gui.id_exists('button_o'):
             gui.get_element('button_o').text = player_o
+        if gui.id_exists('text_player_x'):
+            gui.get_element('text_player_x').text = '  >'[player_move]
         if gui.id_exists('button_x'):
             gui.get_element('button_x').text = player_x
         if gui.id_exists('text_player_win'):
@@ -110,8 +117,9 @@ def set_menu(value):
 
 def sit(value):
     if value in 'xo':
-        print('sending: sit_{}'.format(value))
-        soc.send('sit_{} '.format(value).encode('utf8'))
+        if (value == 'x' and player_x == 'none') or (value == 'o' and player_o == 'none'):
+            print('sending: sit_{}'.format(value))
+            soc.send('sit_{} '.format(value).encode('utf8'))
 
 def send_move(x, y):
     global my_move
@@ -185,8 +193,10 @@ while True:
                         mygui.Button(window, (30 + 120*x, 30 + 120*y), (100, 100),\
                                      on_action=send_move, on_action_args=(x, y)))
         gui.add('textlist_players', mygui.TextList(window, (510, 20), (80, 20), ['xxx']))
+        gui.add('text_player_x', mygui.Text(window, (370, 50), (40, 40)))
         gui.add('button_x', mygui.Button(window, (410, 60), (80, 20),\
                                          on_action=sit, on_action_args=('x')))
+        gui.add('text_player_o', mygui.Text(window, (370, 110), (40, 40)))
         gui.add('button_o', mygui.Button(window, (410, 120), (80, 20),\
                                          on_action=sit, on_action_args=('o')))
         gui.add('text_player_win', mygui.Text(window, (510, 300), (80, 20)))
