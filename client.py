@@ -13,7 +13,7 @@ soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 if len(sys.argv) > 1:
     host = sys.argv[1]
 else:
-    host = '127.0.0.1'
+    host = 'localhost'
 print('host: {}'.format(host))
 port = 8888
 
@@ -30,7 +30,9 @@ icon.fill((255, 255, 255))
 pygame.display.set_icon(icon)
 
 # game state variables
-nickname = ''
+login = ''
+password = ''
+login_success = 0
 board = [[0 for x in range(3)] for y in range(3)]
 players_list = []
 player_x = ''
@@ -56,14 +58,31 @@ def connection_thread():
     global player_o
     global player_win
     global soc
-    global nickname
+    global login
+    global password
+    global login_success
     global my_move
     
-    soc.send(nickname.encode('utf8'))
-    print('sending: {}'. format(nickname))
+    print('thread started')
     
+    if menu == 'try_login':
+        soc.send('login {} {}'.format(login, password).encode('utf8'))
+        print('sending: login {} {}'.format(login, password))
+    else:
+        soc.send('register {} {}'.format(login, password).encode('utf8'))
+        print('sending: register {} {}'.format(login, password))
+    login_result = soc.recv(1024).decode('utf8')
+    if re.match(r'success', login_result) is not None:
+        print('login success')
+        login_success = 1
+    else:
+        print('login error')
+        login_success = 2
+        return
+        
     while True:
         # receive game state from server
+        print('waiting for data')
         msg_from_server = soc.recv(1024).decode('utf8')
         if re.match(r'^closed', msg_from_server) is not None:
             break
@@ -106,11 +125,6 @@ def connection_thread():
             else:
                 gui.get_element('text_player_win').text = '{} wins'.format(' OX'[player_win])
             
-        
-def next_menu():
-    global menu
-    menu += 1
-        
 def set_menu(value):
     global menu
     menu = value
@@ -129,22 +143,29 @@ def send_move(x, y):
         print('sending: move {} {}'.format(x, y))
         soc.send('move {} {} '.format(x, y).encode('utf8'))
 
-menu = 0
+menu = 'login'
 
 gui = mygui.GUI(window)
 
 # main loop
 while True:
     # connection menu
-    if menu == 0:
+    if menu == 'login':
         # gui
+        login_success = 0
         gui.clear()
-        gui.add('textbox_nickname', mygui.TextBox(window, (180, 140), (240, 40), \
-                                                  'insert your nick'))
-        gui.add('connect_button', mygui.Button(window, (180, 220), (240, 40), \
-                                               'connect', on_action=next_menu))
-        gui.get_element('textbox_nickname').text = nickname
-    while menu == 0:
+        gui.add('textbox_login', mygui.TextBox(window, (180, 100), (240, 40),\
+                                                  'login'))
+        gui.add('textbox_password', mygui.TextBox(window, (180, 180), (240, 40),\
+                                                  'password'))
+        gui.add('login_button', mygui.Button(window, (180, 260), (100, 40),\
+                                               'login', on_action=set_menu,\
+                                               on_action_args=('try_login',)))
+        gui.add('register_button', mygui.Button(window, (320, 260), (100, 40),\
+                                               'register', on_action=set_menu,\
+                                               on_action_args=('register',)))
+        gui.get_element('textbox_login').text = login
+    while menu == 'login':
         # handling events
         for event in pygame.event.get():
             if event.type == QUIT:
@@ -154,27 +175,45 @@ while True:
         window.fill(mygui.colors['white'])
         gui.draw()
         pygame.display.update()
-    # connection result
-    if menu == 1:
+        
+    if menu in ['try_login', 'register']:
         # connection with server
         connected = True
-        nickname = gui.get_element('textbox_nickname').text
-        if len(nickname) < 4:
-            menu = 0
+        login = gui.get_element('textbox_login').text
+        password = gui.get_element('textbox_password').text # <--hash it
+        if len(login) < 4 or len(password) < 4:
+            print('too short login or password')
+            menu = 'login'
         else:
             try:
+                print('trying to connect')
                 soc.connect((host, port))
+                print('trying to start thread')
                 Thread(target=connection_thread).start()
             except:
                 connected = False
-            gui.clear()
             if connected:
-                gui.add('textbox_connected', mygui.Text(window, (180, 140), (240, 40), 'Connected with server'))
-                gui.add('textbox_ok', mygui.Button(window, (180, 220), (240, 40), 'OK', on_action=next_menu))
+                while login_success == 0:
+                    pass
+            gui.clear()
+            if not connected:
+                gui.add('textbox_connection_error', mygui.Text(window, (180, 140), (240, 40),\
+                                                               'Connection error'))
+                gui.add('button_retry', mygui.Button(window, (180, 220), (240, 40), 'Retry connection',\
+                                                     on_action=set_menu, on_action_args=('login',)))
+            elif login_success != 1:
+                gui.add('textbox_connection_error', mygui.Text(window, (180, 140), (240, 40),\
+                                                               'Login error'))
+                gui.add('button_retry', mygui.Button(window, (180, 220), (240, 40), 'Retry',\
+                                                     on_action=set_menu, on_action_args=('login',)))
+                soc.close()
+                soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             else:
-                gui.add('textbox_connection_error', mygui.Text(window, (180, 140), (240, 40), 'Connection error'))
-                gui.add('button_retry', mygui.Button(window, (180, 220), (240, 40), 'Retry connection', on_action=set_menu, on_action_args=(0,)))
-    while menu == 1:
+                gui.add('textbox_connected', mygui.Text(window, (180, 140), (240, 40),\
+                                                        'Connected with server'))
+                gui.add('textbox_ok', mygui.Button(window, (180, 220), (240, 40), 'OK',\
+                                               on_action=set_menu, on_action_args=('game',)))
+    while menu in ['try_login', 'register']:
         # handling events
         for event in pygame.event.get():
             if event.type == QUIT:
@@ -185,7 +224,7 @@ while True:
         gui.draw()
         pygame.display.update()
     # game
-    if menu == 2:
+    if menu == 'game':
         gui.clear()
         for x in range(3):
             for y in range(3):
@@ -201,7 +240,7 @@ while True:
                                          on_action=sit, on_action_args=('o')))
         gui.add('text_player_win', mygui.Text(window, (510, 300), (80, 20)))
         
-    while menu == 2:
+    while menu == 'game':
         # handling events
         for event in pygame.event.get():
             if event.type == QUIT:

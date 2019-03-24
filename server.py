@@ -71,15 +71,49 @@ def start_server():
 
     # infinite loop- do not reset for every requests
     while True:
+        print('waiting for connection')
         connection, address = soc.accept()
         ip, port = str(address[0]), str(address[1])
         print("Connected with {}:{}".format(ip, port))
+        action, player_nickname, player_password = connection.recv(5120).decode('utf8').split()[0:3]
+        print('received: {} {} {} from {}:{}'.format(action, player_nickname, player_password, ip, port))
+        login_ok = False
+        player_points = 0
+        if action == 'login':
+            login_ok = False
+            for line in open('users.txt', 'r').readlines()[:-1]:
+                line = line.split()
+                if player_nickname == line[0] and\
+                   player_password == line[1]: # <-- hash check it
+                    login_ok = True
+                    player_points = int(line[2])
+                    break
+        elif action == 'register':
+            login_ok = True
+            for line in open('users.txt', 'r').readlines()[:-1]:
+                line = line.split()
+                if player_nickname == line[0]:
+                    login_ok = False
+                    break
+            if login_ok:
+                file_users = open('users.txt', 'a')
+                file_users.write('{} {} {}\n'.format(player_nickname, player_password, 0))
+                file_users.close()
 
-        try:
-            Thread(target=client_thread, args=(connection, ip, port)).start()
-            Thread(target=data_receive_thread, args=(connection, ip, port)).start()
-        except:
-            print("Thread did not start.")
+        if  not login_ok:
+            connection.send('failure'.encode('utf8'))
+        else:
+            connection.send('success'.encode('utf8'))
+            
+            player_id = '{}:{}'.format(ip, port)
+            players[player_id] = [player_nickname, 0, player_points]
+            send_state[player_id] = True
+            
+            try:
+                Thread(target=client_thread, args=(connection, ip, port)).start()
+                Thread(target=data_receive_thread, args=(connection, ip, port)).start()
+            except:
+                print("Thread did not start.")
     soc.close()
     
 def data_receive_thread(connection, ip, port, max_buffer_size=5120):
@@ -164,15 +198,9 @@ def client_thread(connection, ip, port, max_buffer_size=5120):
     global player_o
     global player_win
     global player_move
-
-    player_nickname = connection.recv(max_buffer_size).decode('utf8')
-    print('received: {} from {}:{}'.format(player_nickname, ip, port))
-    player_id = 1
-    player_mode = 0
     
     player_id = '{}:{}'.format(ip, port)
-    players[player_id] = [player_nickname, 0, 0]
-    send_state[player_id] = True
+    player_nickname = players[player_id]
     
     for key in send_state.keys():
         send_state[key] = True

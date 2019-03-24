@@ -271,7 +271,7 @@ class TextBox(GUIElement):
                 self.__is_active = True
             else:
                 self.__is_active = False
-        if event.type == KEYDOWN:
+        if self.__is_active and event.type == KEYDOWN:
             if event.unicode in string.ascii_letters + string.digits and len(self.__text) < self.__max_text_len:
                 self.__text += event.unicode
             if event.key == K_BACKSPACE and len(self.__text) > 0:
