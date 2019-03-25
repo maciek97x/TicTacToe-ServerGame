@@ -10,8 +10,8 @@ import os
 from random import randint
 import re
 import time
+import datetime
 
-os.system("mode con: cols=50 lines=20")
 players = dict([])
 game_in_progress = False
 board = [[0 for _ in range(3)] for _ in range(3)]
@@ -21,6 +21,7 @@ player_o = 'none'
 player_win = 0
 player_move = 1
 send_state = dict([])
+log_stack = []
 
 def hash_password(password):
     salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
@@ -70,6 +71,13 @@ def check_board():
     return 0
 
 def start_server():
+    if not os.path.isfile('users.txt'):
+        temp_file = open('users.txt', 'w')
+        temp_file.close()
+    if not os.path.isfile('log.txt'):
+        temp_file = open('log.txt', 'w')
+        temp_file.close()
+    
     host = 'localhost'
     port = 8888  # arbitrary non-privileged port
 
@@ -82,18 +90,23 @@ def start_server():
     except:
         print("Bind failed. Error : " + str(sys.exc_info()))
         sys.exit()
+    
+    try:
+        Thread(target=log_thread).start()
+        print('log thread started')
+    except:
+        print('log thread not started')
 
     soc.listen(5)  # queue up to 5 requests
     print("Socket now listening")
-
+    
     # infinite loop- do not reset for every requests
     while True:
         print('waiting for connection')
         connection, address = soc.accept()
         ip, port = str(address[0]), str(address[1])
         print("Connected with {}:{}".format(ip, port))
-        action, player_nickname, player_password = connection.recv(5120).decode('utf8').split()[0:3]
-        print('received: {} {} {} from {}:{}'.format(action, player_nickname, player_password, ip, port))
+        action, player_nickname, player_password = receive_data(connection, ip, port).split()[0:3]
         login_ok = False
         player_points = 0
         if action == 'login':
@@ -118,9 +131,9 @@ def start_server():
                 file_users.close()
 
         if  not login_ok:
-            connection.send('failure'.encode('utf8'))
+            send_data(connection, ip, port, 'failure')
         else:
-            connection.send('success'.encode('utf8'))
+            send_data(connection, ip, port, 'success')
             
             player_id = '{}:{}'.format(ip, port)
             players[player_id] = [player_nickname, 0, player_points]
@@ -133,7 +146,42 @@ def start_server():
                 print("Thread did not start.")
     soc.close()
     
-def data_receive_thread(connection, ip, port, max_buffer_size=5120):
+def send_data(connection, ip, port, data):
+    global log_stack
+    now = datetime.datetime.now()
+    connection.send(data.encode('utf8'))
+    log_line = '{} {} {} {}:{}:{} to {}:{} {}'.format(now.day, now.month, now.year,\
+                                                        now.hour, now.minute, now.second,\
+                                                        ip, port, data)
+    log_stack.append(log_line)
+    print(log_line)
+    
+    
+def receive_data(connection, ip, port, max_buffer_size=5120):
+    global log_stack
+    now = datetime.datetime.now()
+    received_data = connection.recv(max_buffer_size).decode('utf8')
+    received_data = received_data.lstrip()
+    log_line = '{} {} {} {}:{}:{} from {}:{} {}'.format(now.day, now.month, now.year,\
+                                                        now.hour, now.minute, now.second,\
+                                                        ip, port, received_data)
+    log_stack.append(log_line)
+    print(log_line)
+    return received_data
+    
+    
+def log_thread():
+    global log_stack
+    while True:
+        time.sleep(.5)
+        if len(log_stack) > 0:
+            log_file = open('log.txt', 'a')
+            log_file.write('{}\n'.format(log_stack[0]))
+            log_file.close()
+            del log_stack[0]
+    
+    
+def data_receive_thread(connection, ip, port):
     global board
     global game_in_progress
     global players
@@ -147,8 +195,7 @@ def data_receive_thread(connection, ip, port, max_buffer_size=5120):
 
     # game loop
     while True:
-        received_data = connection.recv(max_buffer_size).decode('utf8')
-        print('received: {} from {}:{}'.format(received_data, ip, port))
+        received_data = receive_data(connection, ip, port)
         data = received_data.split()
         if re.match(r'^quit', received_data ) is not None:
             del players[player_id]
@@ -235,7 +282,7 @@ def client_thread(connection, ip, port, max_buffer_size=5120):
                             ' n ' + str(player_move) +\
                             ' w ' + str(player_win) +\
                             ' m ' + str(int(player_move == players[player_id][1]))
-                connection.send(game_state.encode('utf8'))
+                send_data(connection, ip, port, game_state)
                 send_state[player_id] = False
         except:
             break
