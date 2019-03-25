@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import hashlib
+import binascii
 import socket
 import sys
 import traceback
@@ -19,6 +21,21 @@ player_o = 'none'
 player_win = 0
 player_move = 1
 send_state = dict([])
+
+def hash_password(password):
+    salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
+    password_hash = hashlib.pbkdf2_hmac('sha512', password.encode('utf8'),\
+                                        salt, 100000)
+    password_hash = binascii.hexlify(password_hash)
+    return (salt + password_hash).decode('ascii')
+
+def verify_password(stored, provided):
+    salt = stored[:64]
+    stored = stored[64:]
+    password_hash = hashlib.pbkdf2_hmac('sha512', provided.encode('utf8'),\
+                                        salt.encode('ascii'), 100000)
+    password_hash = binascii.hexlify(password_hash).decode('ascii')
+    return stored == password_hash
 
 def save_to_file(msg, ip, port, if_out):
     file = open('server_log.txt', 'a')
@@ -84,7 +101,7 @@ def start_server():
             for line in open('users.txt', 'r').readlines()[:-1]:
                 line = line.split()
                 if player_nickname == line[0] and\
-                   player_password == line[1]: # <-- hash check it
+                   verify_password(line[1], player_password):
                     login_ok = True
                     player_points = int(line[2])
                     break

@@ -1,6 +1,8 @@
 import socket
 import sys
 import time
+import hashlib
+import binascii
 import pygame
 from pygame.locals import *
 from threading import Thread
@@ -41,6 +43,12 @@ player_move = 0
 player_win = 0
 my_move = True
 
+def hash_password(password):
+    salt = hashlib.sha256(os.urandom(60)).hexdigest().encode('ascii')
+    password_hash = hashlib.pbkdf2_hmac('sha512', password.encode('utf8'),\
+                                        salt, 100000)
+    password_hash = binascii.hexlify(password_hash)
+    return (salt + password_hash).decode('ascii')
 
 def terminate():
     global soc
@@ -180,7 +188,7 @@ while True:
         # connection with server
         connected = True
         login = gui.get_element('textbox_login').text
-        password = gui.get_element('textbox_password').text # <--hash it
+        password = hash_password(gui.get_element('textbox_password').text)
         if len(login) < 4 or len(password) < 4:
             print('too short login or password')
             menu = 'login'
