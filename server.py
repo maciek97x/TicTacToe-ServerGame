@@ -98,7 +98,7 @@ def start_server():
         player_points = 0
         if action == 'login':
             login_ok = False
-            for line in open('users.txt', 'r').readlines()[:-1]:
+            for line in open('users.txt', 'r').readlines():
                 line = line.split()
                 if player_nickname == line[0] and\
                    verify_password(line[1], player_password):
@@ -114,7 +114,7 @@ def start_server():
                     break
             if login_ok:
                 file_users = open('users.txt', 'a')
-                file_users.write('{} {} {}\n'.format(player_nickname, player_password, 0))
+                file_users.write('{} {} {}\n'.format(player_nickname, hash_password(player_password), 0))
                 file_users.close()
 
         if  not login_ok:
